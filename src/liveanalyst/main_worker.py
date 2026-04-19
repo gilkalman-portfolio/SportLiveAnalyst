@@ -106,13 +106,17 @@ def main() -> None:
         load_dotenv()
     except ImportError:
         pass
+    import os
+    os.makedirs("logs", exist_ok=True)
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    try:
+        handlers.append(logging.FileHandler("logs/worker.log", encoding="utf-8"))
+    except OSError:
+        pass
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler("logs/worker.log", encoding="utf-8"),
-        ],
+        handlers=handlers,
     )
     settings = Settings.from_env()
     MainWorker(settings).run_forever()
