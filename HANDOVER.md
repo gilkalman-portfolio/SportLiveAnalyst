@@ -45,18 +45,6 @@ _עדכון אחרון: 2026-04-18 (סשן 6)_
 | **Prematch restart optimization** — standings/injuries נטענים רק עבור leagues עם fixtures חדשים | ✅ חדש — 2026-04-18 |
 | bets_log / CLV tracking | ❌ לא התחיל |
 
----
-
-## .env — ערכים נוכחיים
-
-```
-POSTGRES_DSN=postgresql://postgres:jojo123@localhost:5432/postgres
-API_FOOTBALL_KEY=dfe30b2ed8d08960348582f2495c9e31   ← Pro plan ($19/month)
-TELEGRAM_BOT_TOKEN=8657005539:AAF92Inr2AX_WWlC14UjLX57UjuUHQ6VKEk
-TELEGRAM_CHAT_ID=307448954                          ← chat_id אמיתי (לא update_id)
-LEAGUE_IDS=39,140,78,135,61                         ← PL, La Liga, Bundesliga, Serie A, Ligue 1
-SEASON=2025
-```
 
 ---
 
