@@ -214,16 +214,80 @@ class Database:
             return result
 
     def upsert_team_standing(self, team_id: int, league_id: int, season: int, position: int, points: int, games_played: int) -> None:
+        """Upsert live/current standings snapshot (round=0)."""
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO team_standings (team_id, league_id, season, position, points, games_played, fetched_at)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                ON CONFLICT (team_id, league_id, season) DO UPDATE
+                INSERT INTO team_standings (team_id, league_id, season, round, position, points, games_played, fetched_at)
+                VALUES (%s, %s, %s, 0, %s, %s, %s, NOW())
+                ON CONFLICT (team_id, league_id, season, round) DO UPDATE
                 SET position = EXCLUDED.position,
                     points = EXCLUDED.points,
                     games_played = EXCLUDED.games_played,
                     fetched_at = EXCLUDED.fetched_at
                 """,
                 (team_id, league_id, season, position, points, games_played),
+            )
+
+    def upsert_team_standing_for_round(self, team_id: int, league_id: int, season: int, round_num: int, position: int, points: int, games_played: int) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO team_standings (team_id, league_id, season, round, position, points, games_played, fetched_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (team_id, league_id, season, round) DO UPDATE
+                SET position = EXCLUDED.position,
+                    points = EXCLUDED.points,
+                    games_played = EXCLUDED.games_played,
+                    fetched_at = EXCLUDED.fetched_at
+                """,
+                (team_id, league_id, season, round_num, position, points, games_played),
+            )
+
+    def upsert_fixture_info(self, fixture_id: int, league_id: int, season: int, round_num: int, home_team_id: int, away_team_id: int) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO fixtures (fixture_id, league_id, season, round, home_team_id, away_team_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (fixture_id) DO NOTHING
+                """,
+                (fixture_id, league_id, season, round_num, home_team_id, away_team_id),
+            )
+
+    def get_fixture_info(self, fixture_id: int) -> dict[str, Any] | None:
+        with self.conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+            cur.execute("SELECT * FROM fixtures WHERE fixture_id = %s", (fixture_id,))
+            return cur.fetchone()
+
+    def get_standings_for_round(self, home_team_id: int, away_team_id: int, league_id: int, season: int, round_num: int) -> list[dict[str, Any]]:
+        with self.conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+            cur.execute(
+                """
+                SELECT team_id, position, points, games_played
+                FROM team_standings
+                WHERE team_id = ANY(%s) AND league_id = %s AND season = %s AND round = %s
+                """,
+                ([home_team_id, away_team_id], league_id, season, round_num),
+            )
+            rows = {r["team_id"]: r for r in cur.fetchall()}
+            return [rows[tid] for tid in (home_team_id, away_team_id) if tid in rows]
+
+    def get_signals_without_motivation(self) -> list[dict[str, Any]]:
+        with self.conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+            cur.execute(
+                "SELECT id, fixture_id FROM signals WHERE home_motivation IS NULL ORDER BY ts_created"
+            )
+            return list(cur.fetchall())
+
+    def update_signal_motivation(self, signal_id: int, home_motivation: float, away_motivation: float, home_stake: str, away_stake: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE signals
+                SET home_motivation = %s, away_motivation = %s,
+                    home_stake = %s, away_stake = %s
+                WHERE id = %s
+                """,
+                (home_motivation, away_motivation, home_stake, away_stake, signal_id),
             )

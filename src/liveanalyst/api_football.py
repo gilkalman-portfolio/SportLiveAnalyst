@@ -63,3 +63,61 @@ class APIFootballClient:
         league_data = response[0].get("league", {})
         standings = league_data.get("standings", [])
         return standings[0] if standings else []
+
+    def get_standings_by_round(self, league_id: int, season: int, round_num: int) -> list[dict[str, Any]]:
+        data = self._get("/standings", league=league_id, season=season, round=round_num)
+        response = data.get("response", [])
+        if not response:
+            return []
+        league_data = response[0].get("league", {})
+        standings = league_data.get("standings", [])
+        return standings[0] if standings else []
+
+    def get_fixture_info(self, fixture_id: int) -> dict[str, Any] | None:
+        data = self._get("/fixtures", id=fixture_id)
+        response = data.get("response", [])
+        if not response:
+            return None
+        f = response[0]
+        round_str = f.get("league", {}).get("round", "")
+        round_num = _parse_round(round_str)
+        return {
+            "fixture_id": fixture_id,
+            "league_id": f["league"]["id"],
+            "season": f["league"]["season"],
+            "round": round_num,
+            "home_team_id": f["teams"]["home"]["id"],
+            "away_team_id": f["teams"]["away"]["id"],
+        }
+
+    def get_team_recent_form(self, team_id: int, season: int, venue: str, last: int = 5) -> list[str]:
+        """Return last N results ('W'/'D'/'L') for home or away games, most recent first."""
+        params: dict[str, Any] = {"team": team_id, "season": season, "last": last * 2}
+        if venue in ("home", "away"):
+            params["venue"] = venue
+        data = self._get("/fixtures", **params)
+        results = []
+        for f in reversed(data.get("response", [])):
+            goals = f.get("goals", {})
+            teams = f.get("teams", {})
+            is_home = teams.get("home", {}).get("id") == team_id
+            g_for     = goals.get("home") if is_home else goals.get("away")
+            g_against = goals.get("away") if is_home else goals.get("home")
+            if g_for is None or g_against is None:
+                continue
+            if g_for > g_against:
+                results.append("W")
+            elif g_for < g_against:
+                results.append("L")
+            else:
+                results.append("D")
+            if len(results) == last:
+                break
+        return list(reversed(results))  # most recent first
+
+
+def _parse_round(round_str: str) -> int:
+    """Extract integer round from strings like 'Regular Season - 24'."""
+    import re
+    m = re.search(r"(\d+)$", round_str)
+    return int(m.group(1)) if m else 0

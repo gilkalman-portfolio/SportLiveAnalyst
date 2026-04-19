@@ -107,6 +107,7 @@ class LiveAnalystWorker:
     def bootstrap(self) -> None:
         self.db.run_migration("sql/migrations/001_init.sql")
         self.db.run_migration("sql/migrations/002_standings.sql")
+        self.db.run_migration("sql/migrations/003_fixtures_round.sql")
 
     def _refresh_standings_if_needed(self) -> None:
         today = datetime.now(timezone.utc).date()
@@ -124,6 +125,62 @@ class LiveAnalystWorker:
             )
         self._standings_refreshed_date = today
         logging.info("Standings refreshed: %d teams", len(rows))
+
+    def backfill_motivation(self) -> int:
+        signals = self.db.get_signals_without_motivation()
+        updated = 0
+        # Cache standings per round to avoid redundant API calls
+        standings_cache: dict[tuple, bool] = {}
+
+        for sig in signals:
+            fixture_info = self.db.get_fixture_info(sig["fixture_id"])
+            if not fixture_info:
+                raw = self.api.get_fixture_info(sig["fixture_id"])
+                if not raw:
+                    continue
+                self.db.upsert_fixture_info(**raw)
+                fixture_info = self.db.get_fixture_info(sig["fixture_id"])
+            if not fixture_info:
+                continue
+
+            league_id  = fixture_info["league_id"]
+            season     = fixture_info["season"]
+            round_num  = fixture_info["round"]
+            home_id    = fixture_info["home_team_id"]
+            away_id    = fixture_info["away_team_id"]
+
+            cache_key = (league_id, season, round_num)
+            if cache_key not in standings_cache:
+                rows = self.api.get_standings_by_round(league_id, season, round_num)
+                for entry in rows:
+                    self.db.upsert_team_standing_for_round(
+                        team_id=entry["team"]["id"],
+                        league_id=league_id,
+                        season=season,
+                        round_num=round_num,
+                        position=entry["rank"],
+                        points=entry["points"],
+                        games_played=entry["all"]["played"],
+                    )
+                standings_cache[cache_key] = True
+
+            standings = self.db.get_standings_for_round(home_id, away_id, league_id, season, round_num)
+            if len(standings) < 2:
+                continue
+
+            home_row, away_row = standings[0], standings[1]
+            home_s = TeamStanding(home_row["team_id"], home_row["position"], home_row["points"], home_row["games_played"], 38)
+            away_s = TeamStanding(away_row["team_id"], away_row["position"], away_row["points"], away_row["games_played"], 38)
+            home_stake = classify_stake(home_s, league_id)
+            away_stake = classify_stake(away_s, league_id)
+            home_mot   = compute_motivation(home_stake, home_s.games_remaining)
+            away_mot   = compute_motivation(away_stake, away_s.games_remaining)
+
+            self.db.update_signal_motivation(sig["id"], home_mot, away_mot, home_stake.value, away_stake.value)
+            updated += 1
+
+        logging.info("backfill_motivation: updated %d signals", updated)
+        return updated
 
     def _get_motivation(
         self, home_team_id: int, away_team_id: int
@@ -158,6 +215,18 @@ class LiveAnalystWorker:
         away_name = fixture["teams"]["away"]["name"]
 
         self._refresh_standings_if_needed()
+
+        round_str = fixture.get("league", {}).get("round", "")
+        from liveanalyst.api_football import _parse_round
+        round_num = _parse_round(round_str)
+        self.db.upsert_fixture_info(
+            fixture_id=fixture_id,
+            league_id=self.settings.league_id,
+            season=self.settings.season,
+            round_num=round_num,
+            home_team_id=home_team_id,
+            away_team_id=away_team_id,
+        )
 
         odds = self.api.get_odds_1x2(fixture_id)
         if not odds:
