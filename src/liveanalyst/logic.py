@@ -8,6 +8,16 @@ from liveanalyst.domain import PreMatchPrediction, Probabilities, SeasonStake, T
 ALLOWED_CAUSES = {"GOAL", "RED_CARD", "LINEUP_KEY_PLAYER_OUT"}
 
 
+def key_player_from_lineup_player(player: dict) -> bool:
+    stats = player.get("statistics", {})
+    return (
+        player.get("pos") == "G"
+        or stats.get("xg_rank", 999) <= 2
+        or stats.get("goal_contrib_rank", 999) <= 2
+        or (stats.get("minutes_played_pct", 0) > 70 and stats.get("regular_starter", False))
+    )
+
+
 @dataclass
 class TickSnapshot:
     ts: int

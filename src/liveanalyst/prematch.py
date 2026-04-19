@@ -7,7 +7,7 @@ from liveanalyst.api_football import APIFootballClient
 from liveanalyst.config import Settings
 from liveanalyst.db import Database
 from liveanalyst.domain import PreMatchPrediction, SeasonStake, TeamStanding
-from liveanalyst.logic import classify_stake, compute_motivation, compute_prematch_prediction
+from liveanalyst.logic import classify_stake, compute_motivation, compute_prematch_prediction, key_player_from_lineup_player
 
 
 class PreMatchEngine:
@@ -90,7 +90,6 @@ class PreMatchEngine:
         )
 
     def _count_key_absences(self, fixture_id: int, team_id: int) -> int:
-        from liveanalyst.worker import key_player_from_lineup_player
         data = self.api._get("/injuries", fixture=fixture_id, team=team_id)
         count = 0
         for entry in data.get("response", []):

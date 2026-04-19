@@ -21,8 +21,10 @@ from liveanalyst.logic import (
     compute_motivation,
     evaluate_signal_outcome,
     is_early_signal,
+    key_player_from_lineup_player,
     normalize_probabilities,
 )
+from liveanalyst.prematch import PreMatchEngine
 from liveanalyst.telegram import TelegramSender
 
 
@@ -35,16 +37,6 @@ class PendingFollowUp:
     fixture_id: int
     due_at: datetime
     target_second: int
-
-
-def key_player_from_lineup_player(player: dict) -> bool:
-    stats = player.get("statistics", {})
-    return (
-        player.get("pos") == "G"
-        or stats.get("xg_rank", 999) <= 2
-        or stats.get("goal_contrib_rank", 999) <= 2
-        or (stats.get("minutes_played_pct", 0) > 70 and stats.get("regular_starter", False))
-    )
 
 
 def event_to_cause(event: dict, lineup_lookup: dict[str, bool]) -> tuple[str, bool]:
@@ -103,11 +95,14 @@ class LiveAnalystWorker:
         self.seen_event_fingerprints: set[str] = set()
         self.last_lineup_poll_at: dict[int, datetime] = {}
         self._standings_refreshed_date: datetime | None = None
+        self._prematch_predicted: set[int] = set()
+        self._prematch_engine = PreMatchEngine(settings)
 
     def bootstrap(self) -> None:
         self.db.run_migration("sql/migrations/001_init.sql")
         self.db.run_migration("sql/migrations/002_standings.sql")
         self.db.run_migration("sql/migrations/003_fixtures_round.sql")
+        self.backfill_motivation()
 
     def _refresh_standings_if_needed(self) -> None:
         today = datetime.now(timezone.utc).date()
@@ -260,6 +255,18 @@ class LiveAnalystWorker:
         if should_poll_lineups:
             lineups = self.api.get_fixture_lineups(fixture_id)
             self.last_lineup_poll_at[fixture_id] = now
+            if fixture_id not in self._prematch_predicted:
+                pred = self._prematch_engine.predict(fixture_id)
+                if pred:
+                    self._prematch_predicted.add(fixture_id)
+                    logging.info(
+                        "prematch fixture=%s outcome=%s p_home=%.3f p_draw=%.3f p_away=%.3f "
+                        "confidence=%.2f actionable=%s home_stake=%s away_stake=%s",
+                        fixture_id, pred.predicted_outcome,
+                        pred.p_home, pred.p_draw, pred.p_away,
+                        pred.confidence, pred.actionable,
+                        pred.home_stake, pred.away_stake,
+                    )
         lineup_lookup: dict[str, bool] = {}
         for team in lineups:
             for p in team.get("startXI", []):
