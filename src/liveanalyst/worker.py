@@ -397,7 +397,7 @@ class LiveAnalystWorker:
                 continue
             league_id  = fixture_info["league_id"]
             season     = fixture_info["season"]
-            round_num  = fixture_info["round_num"]
+            round_num  = fixture_info.get("round_num") or fixture_info.get("round", 0)
             home_id    = fixture_info["home_team_id"]
             away_id    = fixture_info["away_team_id"]
             cache_key = (league_id, season, round_num)
