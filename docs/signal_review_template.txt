@@ -1,0 +1,134 @@
+================================================================================
+LiveAnalyst v0 — Post-Run Signal Review
+Date:
+Fixture:
+Reviewer:
+================================================================================
+
+Fill in one block per signal. Copy the values directly from the DB or logs.
+Do not guess — leave a field blank if the data is not available.
+
+--------------------------------------------------------------------------------
+Signal 1
+--------------------------------------------------------------------------------
+fixture:                    (e.g. Arsenal vs Chelsea — fixture_id=12345)
+event_ts:                   (UTC, from signals.event_ts)
+signal_ts:                  (UTC, from signals.ts_created)
+signal_latency_ms:          (signals.signal_latency_ms)
+source_latency_ms:          (signals.source_latency_ms)
+cause:                      (GOAL / RED_CARD / LINEUP_KEY_PLAYER_OUT)
+primary_outcome:            (home / draw / away)
+p_prev:                     (signals.p_prev, e.g. 0.52)
+p_now:                      (signals.p_now, e.g. 0.71)
+delta_abs:                  (signals.delta_abs, e.g. 0.19)
+confidence:                 (signals.confidence, 0.0–1.0)
+tier:                       (LOW / MEDIUM / HIGH)
+status:                     (signal_outcomes.status: confirmed / failed / neutral / insufficient_data)
+max_move_within_120s:       (signal_outcomes.max_move_within_120s)
+reversed_within_120s:       (signal_outcomes.reversed_within_120s: true / false)
+time_to_move:               (signal_outcomes.time_to_move in seconds, or blank)
+
+Assessment:
+- Was it early?       [ ] Yes  [ ] No  [ ] Can't tell
+  Notes:
+
+- Was it stable?      [ ] Yes  [ ] No  [ ] Can't tell
+  Notes:
+
+- Was it actionable?  [ ] Yes  [ ] No
+  Notes:
+
+- Was it noise?       [ ] Yes  [ ] No  [ ] Uncertain
+  Notes:
+
+Overall:
+
+
+--------------------------------------------------------------------------------
+Signal 2
+--------------------------------------------------------------------------------
+fixture:
+event_ts:
+signal_ts:
+signal_latency_ms:
+source_latency_ms:
+cause:
+primary_outcome:
+p_prev:
+p_now:
+delta_abs:
+confidence:
+tier:
+status:
+max_move_within_120s:
+reversed_within_120s:
+time_to_move:
+
+Assessment:
+- Was it early?       [ ] Yes  [ ] No  [ ] Can't tell
+  Notes:
+
+- Was it stable?      [ ] Yes  [ ] No  [ ] Can't tell
+  Notes:
+
+- Was it actionable?  [ ] Yes  [ ] No
+  Notes:
+
+- Was it noise?       [ ] Yes  [ ] No  [ ] Uncertain
+  Notes:
+
+Overall:
+
+
+--------------------------------------------------------------------------------
+Signal 3
+--------------------------------------------------------------------------------
+fixture:
+event_ts:
+signal_ts:
+signal_latency_ms:
+source_latency_ms:
+cause:
+primary_outcome:
+p_prev:
+p_now:
+delta_abs:
+confidence:
+tier:
+status:
+max_move_within_120s:
+reversed_within_120s:
+time_to_move:
+
+Assessment:
+- Was it early?       [ ] Yes  [ ] No  [ ] Can't tell
+  Notes:
+
+- Was it stable?      [ ] Yes  [ ] No  [ ] Can't tell
+  Notes:
+
+- Was it actionable?  [ ] Yes  [ ] No
+  Notes:
+
+- Was it noise?       [ ] Yes  [ ] No  [ ] Uncertain
+  Notes:
+
+Overall:
+
+
+================================================================================
+Run summary
+================================================================================
+Total ticks collected:
+Total events collected:
+Total signals created (actionable):
+Total signals blocked:
+Most common block reason:
+Avg signal_latency_ms:
+Avg source_latency_ms:
+Confirmed / Failed / Neutral / Insufficient:
+
+Top observation from this run:
+
+What to fix before next run:
+================================================================================
