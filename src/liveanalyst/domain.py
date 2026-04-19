@@ -81,30 +81,8 @@ class SignalContext:
     source_latency_ms: int
     tier: str
     signal_type: str = "SHIFT"
-<<<<<<< Updated upstream
     home_motivation: float | None = None
     away_motivation: float | None = None
     home_stake: SeasonStake | None = None
     away_stake: SeasonStake | None = None
-
-
-@dataclass
-class PreMatchPrediction:
-    fixture_id: int
-    ts_created: datetime
-    p_home: float
-    p_draw: float
-    p_away: float
-    predicted_outcome: str        # "home" / "draw" / "away"
-    confidence: float
-    actionable: bool
-    block_reason: str | None
-    home_stake: SeasonStake | None
-    away_stake: SeasonStake | None
-    home_motivation: float | None
-    away_motivation: float | None
-    home_form_score: float | None
-    away_form_score: float | None
-=======
     league_id: int | None = None
->>>>>>> Stashed changes

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import exp, factorial
 
-from liveanalyst.domain import PreMatchPrediction, Probabilities, SeasonStake, TeamStanding
+from liveanalyst.domain import Probabilities, SeasonStake, TeamStanding
 
 
 ALLOWED_CAUSES = {"GOAL", "RED_CARD", "LINEUP_KEY_PLAYER_OUT", "ODDS_MOVE"}
@@ -131,7 +131,6 @@ def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
 
 
-<<<<<<< Updated upstream
 _LEAGUE_CONFIGS: dict[int, dict] = {
     39: {  # Premier League
         "season_games": 38,
@@ -210,100 +209,6 @@ def compute_form_score(results: list[str]) -> float:
     return score / 3.0  # max = 3 * sum(weights) = 3.0
 
 
-def compute_prematch_prediction(
-    fixture_id: int,
-    home_odds: float,
-    draw_odds: float,
-    away_odds: float,
-    home_motivation: float | None,
-    away_motivation: float | None,
-    home_stake: SeasonStake | None,
-    away_stake: SeasonStake | None,
-    home_form_results: list[str],   # last 5 HOME games, most recent first
-    away_form_results: list[str],   # last 5 AWAY games, most recent first
-    home_key_absences: int = 0,
-    away_key_absences: int = 0,
-) -> PreMatchPrediction:
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-
-    base = normalize_probabilities(home_odds, draw_odds, away_odds)
-    p_home_adj = base.home
-    p_draw_adj = base.draw
-    p_away_adj = base.away
-
-    # ── Motivation modifier ──────────────────────────────────────────────
-    mot_known = home_motivation is not None and away_motivation is not None
-    if mot_known:
-        # Relative: one team more motivated → shifts home/away
-        rel_mot = (home_motivation - away_motivation) * _W_MOT_REL
-        p_home_adj += rel_mot
-        p_away_adj -= rel_mot
-        # Absolute: both teams highly motivated → draw less likely (and vice versa)
-        total_mot = (home_motivation + away_motivation) / 2.0
-        draw_mot_adj = -(total_mot - 0.5) * _W_MOT_ABS  # range ≈ -0.015..+0.015
-        p_draw_adj += draw_mot_adj
-
-    # ── Form modifier (home/away split) ──────────────────────────────────
-    home_fs = compute_form_score(home_form_results) if home_form_results else None
-    away_fs = compute_form_score(away_form_results) if away_form_results else None
-    if home_fs is not None and away_fs is not None:
-        form_delta = (home_fs - away_fs) * _W_FORM
-        p_home_adj += form_delta
-        p_away_adj -= form_delta
-
-    # ── Key player absences ───────────────────────────────────────────────
-    p_home_adj -= min(home_key_absences, 2) * _W_ABSENCE
-    p_away_adj -= min(away_key_absences, 2) * _W_ABSENCE
-
-    # ── Normalize so probabilities sum to 1 ──────────────────────────────
-    total = p_home_adj + p_draw_adj + p_away_adj
-    p_home_f = clamp(p_home_adj / total)
-    p_draw_f  = clamp(p_draw_adj  / total)
-    p_away_f  = clamp(p_away_adj  / total)
-
-    predicted_outcome = max(
-        {"home": p_home_f, "draw": p_draw_f, "away": p_away_f},
-        key=lambda k: {"home": p_home_f, "draw": p_draw_f, "away": p_away_f}[k],
-    )
-
-    # ── Confidence ────────────────────────────────────────────────────────
-    confidence = 1.0
-    if not home_form_results:  confidence -= 0.20
-    if not away_form_results:  confidence -= 0.20
-    if not mot_known:          confidence -= 0.15
-    if max(p_home_f, p_draw_f, p_away_f) < 0.40:
-        confidence -= 0.15
-    confidence = clamp(confidence)
-
-    # ── Blocking ──────────────────────────────────────────────────────────
-    reasons: list[str] = []
-    if mot_known and home_motivation < 0.20 and away_motivation < 0.20:
-        reasons.append("dead_rubber")
-    if max(p_home_f, p_draw_f, p_away_f) < 0.35:
-        reasons.append("market_too_even")
-    if confidence < 0.50:
-        reasons.append("low_confidence")
-
-    blocked = bool(reasons)
-    return PreMatchPrediction(
-        fixture_id=fixture_id,
-        ts_created=now,
-        p_home=p_home_f,
-        p_draw=p_draw_f,
-        p_away=p_away_f,
-        predicted_outcome=predicted_outcome,
-        confidence=confidence,
-        actionable=not blocked,
-        block_reason=",".join(reasons) if reasons else None,
-        home_stake=home_stake,
-        away_stake=away_stake,
-        home_motivation=home_motivation,
-        away_motivation=away_motivation,
-        home_form_score=home_fs,
-        away_form_score=away_fs,
-    )
-=======
 def dc_1x2(
     mu_home: float,
     mu_away: float,
@@ -346,4 +251,3 @@ def dc_1x2(
     if total == 0:
         return 1 / 3, 1 / 3, 1 / 3
     return p_home / total, p_draw / total, p_away / total
->>>>>>> Stashed changes

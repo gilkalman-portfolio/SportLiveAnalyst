@@ -228,7 +228,6 @@ class Database:
                 (signal_id, status, time_to_move, max_move, reversed_flag, event_to_odds_ms, is_early_signal),
             )
 
-<<<<<<< Updated upstream
     def get_standings_for_teams(self, home_team_id: int, away_team_id: int, league_id: int, season: int) -> list[dict[str, Any]]:
         """Return [home_row, away_row] standings for the given teams, if available."""
         with self.conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
@@ -325,7 +324,7 @@ class Database:
                 """,
                 (home_motivation, away_motivation, home_stake, away_stake, signal_id),
             )
-=======
+
     def get_tick_minutes_ago(self, fixture_id: int, cutoff: datetime) -> dict[str, Any] | None:
         """Tick closest to (but not after) cutoff — used as baseline for odds-driven signals."""
         with self.conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
@@ -636,4 +635,3 @@ class Database:
                 (fixture_id, minute, cause_type, primary_outcome),
             )
             return cur.fetchone() is not None
->>>>>>> Stashed changes
