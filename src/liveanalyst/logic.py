@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import exp, factorial
 
 from liveanalyst.domain import PreMatchPrediction, Probabilities, SeasonStake, TeamStanding
 
 
-ALLOWED_CAUSES = {"GOAL", "RED_CARD", "LINEUP_KEY_PLAYER_OUT"}
+ALLOWED_CAUSES = {"GOAL", "RED_CARD", "LINEUP_KEY_PLAYER_OUT", "ODDS_MOVE"}
 
 
 def key_player_from_lineup_player(player: dict) -> bool:
@@ -113,9 +114,9 @@ def evaluate_signal_outcome(signal, future_ticks, move_threshold=0.02, reversal_
 
 
 def classify_tier(delta_abs: float) -> str | None:
-    if 0.03 <= delta_abs <= 0.059:
+    if 0.03 <= delta_abs < 0.06:
         return "LOW"
-    if 0.06 <= delta_abs <= 0.099:
+    if 0.06 <= delta_abs < 0.10:
         return "MEDIUM"
     if delta_abs >= 0.10:
         return "HIGH"
@@ -130,6 +131,7 @@ def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
 
 
+<<<<<<< Updated upstream
 _LEAGUE_CONFIGS: dict[int, dict] = {
     39: {  # Premier League
         "season_games": 38,
@@ -301,3 +303,47 @@ def compute_prematch_prediction(
         home_form_score=home_fs,
         away_form_score=away_fs,
     )
+=======
+def dc_1x2(
+    mu_home: float,
+    mu_away: float,
+    rho: float = 0.13,
+    max_goals: int = 7,
+) -> tuple[float, float, float]:
+    """Dixon-Coles 1X2 probabilities with τ correction for low-score scorelines.
+
+    τ correction adjusts the Poisson-independent assumption for:
+      (0,0), (1,0), (0,1), (1,1) — historically over/under-estimated by pure Poisson.
+    rho ≈ 0.13 is a typical league calibration constant.
+    """
+    def _pmf(k: int, mu: float) -> float:
+        return exp(-mu) * mu ** k / factorial(k)
+
+    def _tau(h: int, a: int) -> float:
+        if h == 0 and a == 0:
+            return 1 - mu_home * mu_away * rho
+        if h == 1 and a == 0:
+            return 1 + mu_away * rho
+        if h == 0 and a == 1:
+            return 1 + mu_home * rho
+        if h == 1 and a == 1:
+            return 1 - rho
+        return 1.0
+
+    p_home = p_draw = p_away = 0.0
+    for h in range(max_goals + 1):
+        ph = _pmf(h, mu_home)
+        for a in range(max_goals + 1):
+            prob = ph * _pmf(a, mu_away) * _tau(h, a)
+            if h > a:
+                p_home += prob
+            elif h == a:
+                p_draw += prob
+            else:
+                p_away += prob
+
+    total = p_home + p_draw + p_away
+    if total == 0:
+        return 1 / 3, 1 / 3, 1 / 3
+    return p_home / total, p_draw / total, p_away / total
+>>>>>>> Stashed changes

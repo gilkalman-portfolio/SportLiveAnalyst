@@ -56,6 +56,7 @@ class MarketTick:
     p_draw: float
     p_away: float
     source_latency_ms: int
+    league_id: int | None = None
 
 
 @dataclass
@@ -80,6 +81,7 @@ class SignalContext:
     source_latency_ms: int
     tier: str
     signal_type: str = "SHIFT"
+<<<<<<< Updated upstream
     home_motivation: float | None = None
     away_motivation: float | None = None
     home_stake: SeasonStake | None = None
@@ -103,3 +105,6 @@ class PreMatchPrediction:
     away_motivation: float | None
     home_form_score: float | None
     away_form_score: float | None
+=======
+    league_id: int | None = None
+>>>>>>> Stashed changes
