@@ -136,7 +136,7 @@ class APIFootballClient:
             "fixture_id": fixture_id,
             "league_id": f["league"]["id"],
             "season": f["league"]["season"],
-            "round": _parse_round(round_str),
+            "round_num": _parse_round(round_str),
             "home_team_id": f["teams"]["home"]["id"],
             "away_team_id": f["teams"]["away"]["id"],
         }
