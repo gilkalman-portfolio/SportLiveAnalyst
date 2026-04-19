@@ -10,13 +10,15 @@ import psycopg
 from liveanalyst.api_football import APIFootballClient
 from liveanalyst.config import Settings
 from liveanalyst.db import Database
-from liveanalyst.domain import MarketTick, Probabilities, SignalContext
+from liveanalyst.domain import MarketTick, Probabilities, SeasonStake, SignalContext, TeamStanding
 from liveanalyst.logic import (
     TickSnapshot,
     cause_confidence,
+    classify_stake,
     classify_tier,
     clamp,
     compute_delta,
+    compute_motivation,
     evaluate_signal_outcome,
     is_early_signal,
     normalize_probabilities,
@@ -103,6 +105,26 @@ class LiveAnalystWorker:
 
     def bootstrap(self) -> None:
         self.db.run_migration("sql/migrations/001_init.sql")
+        self.db.run_migration("sql/migrations/002_standings.sql")
+
+    def _get_motivation(
+        self, fixture_id: int
+    ) -> tuple[float | None, float | None, SeasonStake | None, SeasonStake | None]:
+        rows = self.db.get_standings_for_fixture(fixture_id, self.settings.league_id, self.settings.season)
+        if not rows or len(rows) < 2:
+            return None, None, None, None
+        home_row, away_row = rows[0], rows[1]
+        cfg_games = 38  # Premier League; extend via LEAGUE_CONFIGS if needed
+        home_s = TeamStanding(home_row["team_id"], home_row["position"], home_row["points"], home_row["games_played"], cfg_games)
+        away_s = TeamStanding(away_row["team_id"], away_row["position"], away_row["points"], away_row["games_played"], cfg_games)
+        home_stake = classify_stake(home_s, self.settings.league_id)
+        away_stake = classify_stake(away_s, self.settings.league_id)
+        return (
+            compute_motivation(home_stake, home_s.games_remaining),
+            compute_motivation(away_stake, away_s.games_remaining),
+            home_stake,
+            away_stake,
+        )
 
     def run_once(self) -> None:
         fixture = self.api.get_live_premier_league_fixture(self.settings.league_id, self.settings.season)
@@ -241,6 +263,23 @@ class LiveAnalystWorker:
                 blocked = True
                 reasons.append("cooldown_300s")
 
+            home_motivation, away_motivation, home_stake, away_stake = self._get_motivation(fixture_id)
+
+            if home_motivation is not None and away_motivation is not None:
+                if home_motivation < 0.25 and away_motivation < 0.25:
+                    blocked = True
+                    reasons.append("dead_rubber_match")
+                if direction == "up":
+                    if outcome == "home" and home_motivation < 0.25:
+                        confidence -= 0.20
+                    elif outcome == "away" and away_motivation < 0.25:
+                        confidence -= 0.20
+                    if outcome == "home" and home_motivation > 0.85:
+                        confidence = clamp(confidence + 0.10)
+                    elif outcome == "away" and away_motivation > 0.85:
+                        confidence = clamp(confidence + 0.10)
+                confidence = clamp(confidence)
+
             signal = SignalContext(
                 fixture_id=fixture_id,
                 ts_created=now,
@@ -261,6 +300,10 @@ class LiveAnalystWorker:
                 signal_latency_ms=int((datetime.now(timezone.utc) - ev_ts).total_seconds() * 1000),
                 source_latency_ms=source_latency_ms,
                 tier=tier,
+                home_motivation=home_motivation,
+                away_motivation=away_motivation,
+                home_stake=home_stake,
+                away_stake=away_stake,
             )
             signal_id = self.db.insert_signal(signal)
 

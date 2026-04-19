@@ -194,3 +194,37 @@ class Database:
                 """,
                 (signal_id, status, time_to_move, max_move, reversed_flag),
             )
+
+    def get_standings_for_fixture(self, fixture_id: int, league_id: int, season: int) -> list[dict[str, Any]]:
+        """Return [home_row, away_row] standings for the two teams in a fixture, if available."""
+        with self.conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+            cur.execute(
+                """
+                SELECT ts.team_id, ts.position, ts.points, ts.games_played
+                FROM team_standings ts
+                JOIN (
+                    SELECT home_team_id AS team_id FROM fixture_teams WHERE fixture_id = %s
+                    UNION ALL
+                    SELECT away_team_id AS team_id FROM fixture_teams WHERE fixture_id = %s
+                ) ft ON ts.team_id = ft.team_id
+                WHERE ts.league_id = %s AND ts.season = %s
+                ORDER BY ft.team_id
+                """,
+                (fixture_id, fixture_id, league_id, season),
+            )
+            return list(cur.fetchall())
+
+    def upsert_team_standing(self, team_id: int, league_id: int, season: int, position: int, points: int, games_played: int) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO team_standings (team_id, league_id, season, position, points, games_played, fetched_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (team_id, league_id, season) DO UPDATE
+                SET position = EXCLUDED.position,
+                    points = EXCLUDED.points,
+                    games_played = EXCLUDED.games_played,
+                    fetched_at = EXCLUDED.fetched_at
+                """,
+                (team_id, league_id, season, position, points, games_played),
+            )

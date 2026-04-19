@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from liveanalyst.domain import Probabilities
+from liveanalyst.domain import Probabilities, SeasonStake, TeamStanding
 
 
 ALLOWED_CAUSES = {"GOAL", "RED_CARD", "LINEUP_KEY_PLAYER_OUT"}
@@ -118,3 +118,61 @@ def cause_confidence(cause: str) -> float:
 
 def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return max(low, min(high, value))
+
+
+_LEAGUE_CONFIGS: dict[int, dict] = {
+    39: {  # Premier League
+        "season_games": 38,
+        "cl_spots": 4,
+        "el_spots": [5, 6],
+        "conf_spots": [7],
+        "relegation_spots": 3,
+    }
+}
+
+_STAKE_BASE: dict[SeasonStake, float] = {
+    SeasonStake.TITLE: 1.0,
+    SeasonStake.RELEGATION: 1.0,
+    SeasonStake.CHAMPIONS_LEAGUE: 0.9,
+    SeasonStake.EUROPA_LEAGUE: 0.75,
+    SeasonStake.CONFERENCE: 0.6,
+    SeasonStake.MID_TABLE: 0.35,
+    SeasonStake.SECURED_SAFE: 0.2,
+    SeasonStake.RELEGATED: 0.1,
+}
+
+
+def classify_stake(standing: TeamStanding, league_id: int) -> SeasonStake:
+    cfg = _LEAGUE_CONFIGS.get(league_id, _LEAGUE_CONFIGS[39])
+    pos = standing.position
+    rem = standing.games_remaining
+    total = cfg["season_games"]
+    rel_zone = total - cfg["relegation_spots"] + 1
+
+    if pos >= rel_zone and rem <= 2:
+        return SeasonStake.RELEGATED
+    if pos >= rel_zone:
+        return SeasonStake.RELEGATION
+    safe_buffer = cfg["relegation_spots"] * 3
+    if pos < rel_zone and rem <= safe_buffer // 3:
+        return SeasonStake.SECURED_SAFE
+    if pos == 1:
+        return SeasonStake.TITLE
+    if pos <= cfg["cl_spots"]:
+        return SeasonStake.CHAMPIONS_LEAGUE
+    if pos in cfg["el_spots"]:
+        return SeasonStake.EUROPA_LEAGUE
+    if pos in cfg["conf_spots"]:
+        return SeasonStake.CONFERENCE
+    return SeasonStake.MID_TABLE
+
+
+def compute_motivation(stake: SeasonStake, games_remaining: int) -> float:
+    base = _STAKE_BASE[stake]
+    if games_remaining <= 3:
+        multiplier = 1.3
+    elif games_remaining <= 7:
+        multiplier = 1.1
+    else:
+        multiplier = 1.0
+    return clamp(base * multiplier)
