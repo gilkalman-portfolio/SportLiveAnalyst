@@ -102,19 +102,37 @@ class LiveAnalystWorker:
         self.follow_ups: list[PendingFollowUp] = []
         self.seen_event_fingerprints: set[str] = set()
         self.last_lineup_poll_at: dict[int, datetime] = {}
+        self._standings_refreshed_date: datetime | None = None
 
     def bootstrap(self) -> None:
         self.db.run_migration("sql/migrations/001_init.sql")
         self.db.run_migration("sql/migrations/002_standings.sql")
 
+    def _refresh_standings_if_needed(self) -> None:
+        today = datetime.now(timezone.utc).date()
+        if self._standings_refreshed_date == today:
+            return
+        rows = self.api.get_standings(self.settings.league_id, self.settings.season)
+        for entry in rows:
+            self.db.upsert_team_standing(
+                team_id=entry["team"]["id"],
+                league_id=self.settings.league_id,
+                season=self.settings.season,
+                position=entry["rank"],
+                points=entry["points"],
+                games_played=entry["all"]["played"],
+            )
+        self._standings_refreshed_date = today
+        logging.info("Standings refreshed: %d teams", len(rows))
+
     def _get_motivation(
-        self, fixture_id: int
+        self, home_team_id: int, away_team_id: int
     ) -> tuple[float | None, float | None, SeasonStake | None, SeasonStake | None]:
-        rows = self.db.get_standings_for_fixture(fixture_id, self.settings.league_id, self.settings.season)
-        if not rows or len(rows) < 2:
+        rows = self.db.get_standings_for_teams(home_team_id, away_team_id, self.settings.league_id, self.settings.season)
+        if len(rows) < 2:
             return None, None, None, None
         home_row, away_row = rows[0], rows[1]
-        cfg_games = 38  # Premier League; extend via LEAGUE_CONFIGS if needed
+        cfg_games = 38
         home_s = TeamStanding(home_row["team_id"], home_row["position"], home_row["points"], home_row["games_played"], cfg_games)
         away_s = TeamStanding(away_row["team_id"], away_row["position"], away_row["points"], away_row["games_played"], cfg_games)
         home_stake = classify_stake(home_s, self.settings.league_id)
@@ -134,8 +152,12 @@ class LiveAnalystWorker:
 
         fixture_id = fixture["fixture"]["id"]
         minute = fixture["fixture"]["status"].get("elapsed") or 0
+        home_team_id = fixture["teams"]["home"]["id"]
+        away_team_id = fixture["teams"]["away"]["id"]
         home_name = fixture["teams"]["home"]["name"]
         away_name = fixture["teams"]["away"]["name"]
+
+        self._refresh_standings_if_needed()
 
         odds = self.api.get_odds_1x2(fixture_id)
         if not odds:
@@ -263,7 +285,7 @@ class LiveAnalystWorker:
                 blocked = True
                 reasons.append("cooldown_300s")
 
-            home_motivation, away_motivation, home_stake, away_stake = self._get_motivation(fixture_id)
+            home_motivation, away_motivation, home_stake, away_stake = self._get_motivation(home_team_id, away_team_id)
 
             if home_motivation is not None and away_motivation is not None:
                 if home_motivation < 0.25 and away_motivation < 0.25:

@@ -123,6 +123,7 @@ def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 _LEAGUE_CONFIGS: dict[int, dict] = {
     39: {  # Premier League
         "season_games": 38,
+        "total_teams": 20,
         "cl_spots": 4,
         "el_spots": [5, 6],
         "conf_spots": [7],
@@ -146,16 +147,12 @@ def classify_stake(standing: TeamStanding, league_id: int) -> SeasonStake:
     cfg = _LEAGUE_CONFIGS.get(league_id, _LEAGUE_CONFIGS[39])
     pos = standing.position
     rem = standing.games_remaining
-    total = cfg["season_games"]
-    rel_zone = total - cfg["relegation_spots"] + 1
+    rel_zone = cfg["total_teams"] - cfg["relegation_spots"] + 1  # e.g. 18 for PL
 
     if pos >= rel_zone and rem <= 2:
         return SeasonStake.RELEGATED
     if pos >= rel_zone:
         return SeasonStake.RELEGATION
-    safe_buffer = cfg["relegation_spots"] * 3
-    if pos < rel_zone and rem <= safe_buffer // 3:
-        return SeasonStake.SECURED_SAFE
     if pos == 1:
         return SeasonStake.TITLE
     if pos <= cfg["cl_spots"]:
@@ -164,6 +161,9 @@ def classify_stake(standing: TeamStanding, league_id: int) -> SeasonStake:
         return SeasonStake.EUROPA_LEAGUE
     if pos in cfg["conf_spots"]:
         return SeasonStake.CONFERENCE
+    safe_buffer = cfg["relegation_spots"] * 3
+    if rem <= safe_buffer // 3:
+        return SeasonStake.SECURED_SAFE
     return SeasonStake.MID_TABLE
 
 

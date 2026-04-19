@@ -54,3 +54,12 @@ class APIFootballClient:
     def get_fixture_lineups(self, fixture_id: int) -> list[dict[str, Any]]:
         data = self._get("/fixtures/lineups", fixture=fixture_id)
         return data.get("response", [])
+
+    def get_standings(self, league_id: int, season: int) -> list[dict[str, Any]]:
+        data = self._get("/standings", league=league_id, season=season)
+        response = data.get("response", [])
+        if not response:
+            return []
+        league_data = response[0].get("league", {})
+        standings = league_data.get("standings", [])
+        return standings[0] if standings else []

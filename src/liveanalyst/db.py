@@ -195,24 +195,23 @@ class Database:
                 (signal_id, status, time_to_move, max_move, reversed_flag),
             )
 
-    def get_standings_for_fixture(self, fixture_id: int, league_id: int, season: int) -> list[dict[str, Any]]:
-        """Return [home_row, away_row] standings for the two teams in a fixture, if available."""
+    def get_standings_for_teams(self, home_team_id: int, away_team_id: int, league_id: int, season: int) -> list[dict[str, Any]]:
+        """Return [home_row, away_row] standings for the given teams, if available."""
         with self.conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute(
                 """
-                SELECT ts.team_id, ts.position, ts.points, ts.games_played
-                FROM team_standings ts
-                JOIN (
-                    SELECT home_team_id AS team_id FROM fixture_teams WHERE fixture_id = %s
-                    UNION ALL
-                    SELECT away_team_id AS team_id FROM fixture_teams WHERE fixture_id = %s
-                ) ft ON ts.team_id = ft.team_id
-                WHERE ts.league_id = %s AND ts.season = %s
-                ORDER BY ft.team_id
+                SELECT team_id, position, points, games_played
+                FROM team_standings
+                WHERE team_id = ANY(%s) AND league_id = %s AND season = %s
                 """,
-                (fixture_id, fixture_id, league_id, season),
+                ([home_team_id, away_team_id], league_id, season),
             )
-            return list(cur.fetchall())
+            rows = {r["team_id"]: r for r in cur.fetchall()}
+            result = []
+            for tid in (home_team_id, away_team_id):
+                if tid in rows:
+                    result.append(rows[tid])
+            return result
 
     def upsert_team_standing(self, team_id: int, league_id: int, season: int, position: int, points: int, games_played: int) -> None:
         with self.conn.cursor() as cur:
