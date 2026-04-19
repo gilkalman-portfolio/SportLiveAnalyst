@@ -366,18 +366,19 @@ class LiveAnalystWorker:
         today = datetime.now(timezone.utc).date()
         if self._standings_refreshed_date == today:
             return
-        rows = self.api.get_standings(self.settings.league_id, self.settings.season)
-        for entry in rows:
-            self.db.upsert_team_standing(
-                team_id=entry["team"]["id"],
-                league_id=self.settings.league_id,
-                season=self.settings.season,
-                position=entry["rank"],
-                points=entry["points"],
-                games_played=entry["all"]["played"],
-            )
+        for league_id in self.settings.league_ids:
+            rows = self.api.get_standings(league_id, self.settings.season)
+            for entry in rows:
+                self.db.upsert_team_standing(
+                    team_id=entry["team"]["id"],
+                    league_id=league_id,
+                    season=self.settings.season,
+                    position=entry["rank"],
+                    points=entry["points"],
+                    games_played=entry["all"]["played"],
+                )
+            logging.info("standings_refreshed league=%d teams=%d", league_id, len(rows))
         self._standings_refreshed_date = today
-        logging.info("standings_refreshed teams=%d", len(rows))
 
     def backfill_motivation(self) -> int:
         signals = self.db.get_signals_without_motivation()
@@ -436,14 +437,14 @@ class LiveAnalystWorker:
     def _get_motivation(
         self, home_team_id: int, away_team_id: int
     ) -> tuple[float | None, float | None, SeasonStake | None, SeasonStake | None]:
-        rows = self.db.get_standings_for_teams(home_team_id, away_team_id, self.settings.league_id, self.settings.season)
+        rows = self.db.get_standings_for_teams(home_team_id, away_team_id, league_id, self.settings.season)
         if len(rows) < 2:
             return None, None, None, None
         home_row, away_row = rows[0], rows[1]
         home_s = TeamStanding(home_row["team_id"], home_row["position"], home_row["points"], home_row["games_played"], 38)
         away_s = TeamStanding(away_row["team_id"], away_row["position"], away_row["points"], away_row["games_played"], 38)
-        home_stake = classify_stake(home_s, self.settings.league_id)
-        away_stake = classify_stake(away_s, self.settings.league_id)
+        home_stake = classify_stake(home_s, self.settings.league_ids[0])
+        away_stake = classify_stake(away_s, self.settings.league_ids[0])
         return (
             compute_motivation(home_stake, home_s.games_remaining),
             compute_motivation(away_stake, away_s.games_remaining),
@@ -588,7 +589,7 @@ class LiveAnalystWorker:
         round_num = _parse_round(round_str)
         self.db.upsert_fixture_info(
             fixture_id=fixture_id,
-            league_id=self.settings.league_id,
+            league_id=league_id,
             season=self.settings.season,
             round_num=round_num,
             home_team_id=home_team_id,
