@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liveanalyst"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg[binary]>=3.2",
+    "requests>=2.32",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+liveanalyst-worker   = "liveanalyst.main_worker:main"
+liveanalyst-live     = "liveanalyst.worker:main"
+liveanalyst-prematch  = "liveanalyst.prematch_runner:main"
+liveanalyst-backtest  = "liveanalyst.backtest:main"
+liveanalyst-backtest-fd = "liveanalyst.backtest_fd:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

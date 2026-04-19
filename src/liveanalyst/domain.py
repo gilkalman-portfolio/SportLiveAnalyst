@@ -1,5 +1,40 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
+
+
+class SeasonStake(str, Enum):
+    TITLE = "TITLE"
+    CHAMPIONS_LEAGUE = "CHAMPIONS_LEAGUE"
+    EUROPA_LEAGUE = "EUROPA_LEAGUE"
+    CONFERENCE = "CONFERENCE"
+    MID_TABLE = "MID_TABLE"
+    RELEGATION = "RELEGATION"
+    RELEGATED = "RELEGATED"
+    SECURED_SAFE = "SECURED_SAFE"
+
+
+@dataclass
+class TeamStanding:
+    team_id: int
+    position: int
+    points: int
+    games_played: int
+    season_total_games: int
+
+    @property
+    def games_remaining(self) -> int:
+        return self.season_total_games - self.games_played
+
+
+@dataclass
+class MotivationFactor:
+    home_stake: SeasonStake
+    away_stake: SeasonStake
+    home_motivation: float
+    away_motivation: float
+    home_games_remaining: int
+    away_games_remaining: int
 
 
 @dataclass
@@ -21,6 +56,7 @@ class MarketTick:
     p_draw: float
     p_away: float
     source_latency_ms: int
+    league_id: int | None = None
 
 
 @dataclass
@@ -45,3 +81,30 @@ class SignalContext:
     source_latency_ms: int
     tier: str
     signal_type: str = "SHIFT"
+<<<<<<< Updated upstream
+    home_motivation: float | None = None
+    away_motivation: float | None = None
+    home_stake: SeasonStake | None = None
+    away_stake: SeasonStake | None = None
+
+
+@dataclass
+class PreMatchPrediction:
+    fixture_id: int
+    ts_created: datetime
+    p_home: float
+    p_draw: float
+    p_away: float
+    predicted_outcome: str        # "home" / "draw" / "away"
+    confidence: float
+    actionable: bool
+    block_reason: str | None
+    home_stake: SeasonStake | None
+    away_stake: SeasonStake | None
+    home_motivation: float | None
+    away_motivation: float | None
+    home_form_score: float | None
+    away_form_score: float | None
+=======
+    league_id: int | None = None
+>>>>>>> Stashed changes

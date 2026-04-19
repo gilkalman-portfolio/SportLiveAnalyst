@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: liveanalyst
+Version: 0.1.0
+Requires-Python: >=3.11
+Requires-Dist: psycopg[binary]>=3.2
+Requires-Dist: requests>=2.32
+Requires-Dist: python-dotenv>=1.0
